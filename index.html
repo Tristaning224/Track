@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>项目进度时间轴 - 版式预览</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --surface: #ffffff;
+      --tab-inactive: #dde3ea;
+      --primary: #2563eb;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --line: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px 14px 40px;
+      line-height: 1.5;
+    }
+    .app-wrapper {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    /* ================= 文件夹 Tab 栏 ================= */
+    .tabs-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      overflow-x: auto;
+      padding: 0 4px;
+      /* 隐藏滚动条保持美观 */
+      scrollbar-width: none;
+    }
+    .tabs-bar::-webkit-scrollbar { display: none; }
+
+    .tab-item {
+      padding: 10px 18px;
+      background: var(--tab-inactive);
+      color: var(--muted);
+      border-radius: 10px 10px 0 0;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+      border-bottom: none;
+      user-select: none;
+    }
+    .tab-item:hover {
+      background: #e5eaf0;
+      color: var(--text);
+    }
+    .tab-item.active {
+      background: var(--surface);
+      color: var(--primary);
+      font-weight: 600;
+      padding-top: 12px;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 -2px 6px rgba(0,0,0,0.03);
+    }
+    .tab-add {
+      padding: 8px 14px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px dashed #94a3b8;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tab-add:hover {
+      background: rgba(255,255,255,0.5);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    /* ================= 主体卡片容器 ================= */
+    .main-folder {
+      background: var(--surface);
+      border-radius: 0 12px 12px 12px;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* 第一部分头部：项目名称 */
+    .project-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .project-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .project-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .project-meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .project-actions button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .project-actions button:hover {
+      background: #f1f5f9;
+      color: #dc2626;
+    }
+
+    /* ================= 第一部分：时间轴 ================= */
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 22px;
+      margin-bottom: 28px;
+    }
+    /* 时间轴竖线 */
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--line);
+    }
+
+    .tl-node {
+      position: relative;
+      margin-bottom: 14px;
+    }
+    .tl-node:last-child { margin-bottom: 0; }
+
+    /* 时间轴圆点 */
+    .tl-dot {
+      position: absolute;
+      left: -21px;
+      top: 6px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid #94a3b8;
+    }
+    .tl-node.is-latest .tl-dot {
+      background: var(--primary);
+      border-color: #bfdbfe;
+      box-shadow: 0 0 0 3px #eff6ff;
+      width: 14px;
+      height: 14px;
+      left: -22px;
+      top: 4px;
+    }
+
+    /* 时间标题行（可点击折叠/展开） */
+    .tl-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      padding: 2px 0;
+    }
+    .tl-time {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .tl-node.is-latest .tl-time {
+      color: var(--primary);
+      font-size: 14px;
+    }
+    .tl-badge {
+      font-size: 11px;
+      background: #eff6ff;
+      color: var(--primary);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .tl-toggle-hint {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-left: auto;
+    }
+    .tl-header:hover .tl-time {
+      color: var(--text);
+    }
+
+    /* 展开后的详情内容卡片 */
+    .tl-body {
+      margin-top: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .tl-node.is-latest .tl-body {
+      background: #f8faff;
+      border-color: #dbeafe;
+    }
+    .tl-node.collapsed .tl-body {
+      display: none;
+    }
+
+    .block-item {
+      font-size: 14px;
+    }
+    .block-tag {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+    .tag-done { background: #dcfce7; color: #166534; }
+    .tag-stuck { background: #fef3c7; color: #92400e; }
+    .tag-next { background: #dbeafe; color: #1e40af; }
+    .block-text {
+      color: var(--text);
+      white-space: pre-wrap;
+      padding-left: 2px;
+    }
+
+    /* ================= 第二部分：下方三段式输入区 ================= */
+    .input-section {
+      border-top: 2px dashed var(--border);
+      padding-top: 22px;
+    }
+    .input-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .field-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .field-group label span {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .field-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      background: #fcfcfd;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .field-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    /* 让“下一步”输入框视觉更突出 */
+    .field-group.highlight-input textarea {
+      border-color: #bfdbfe;
+      background: #f8faff;
+    }
+
+    .submit-row {
+      margin-top: 16px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .btn-submit {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-submit:hover { background: #1d4ed8; }
+
+    .empty-state {
+      color: var(--muted);
+      font-size: 14px;
+      padding: 16px 0;
+    }
+
+    @media (max-width: 520px) {
+      .main-folder { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- 顶部文件夹式 Tab -->
+  <div class="tabs-bar" id="tabsBar"></div>
+
+  <!-- 主体内容区 -->
+  <div class="main-folder">
+    <!-- 项目标题行 -->
+    <div class="project-header">
+      <div class="project-title-wrap">
+        <h1 class="project-title" id="projectTitle"></h1>
+        <span class="project-meta" id="projectMeta"></span>
+      </div>
+      <div class="project-actions">
+        <button id="renameBtn">重命名</button>
+        <button id="deleteBtn">删除项目</button>
+      </div>
+    </div>
+
+    <!-- 第一部分：时间轴展示 -->
+    <div class="section-label">📅 进度时间轴（点击过往时间可展开详情）</div>
+    <div class="timeline" id="timeline"></div>
+
+    <!-- 第二部分：三块输入区 -->
+    <div class="input-section">
+      <div class="section-label">✍️ 结束前登记本次进度</div>
+      <div class="input-grid">
+        <div class="field-group">
+          <label>1. 今天做了什么 <span>（已完成的小步进展）</span></label>
+          <textarea id="inDone" rows="2" placeholder="例如：完成了用户登录接口的验证逻辑"></textarea>
+        </div>
+        <div class="field-group">
+          <label>2. 卡在了哪里 / 当前状态 <span>（报错信息或遗留问题）</span></label>
+          <textarea id="inStuck" rows="2" placeholder="例如：目前数据库写入还有个小 Bug，报错信息是 xxx"></textarea>
+        </div>
+        <div class="field-group highlight-input">
+          <label>3. 下次打开第一件要做的事 <span>（越具体越好，方便3秒重启）</span></label>
+          <textarea id="inNext" rows="2" placeholder="例如：打开 user.py 第 45 行，检查密码加密字段的长度限制"></textarea>
+        </div>
+      </div>
+      <div class="submit-row">
+        <button class="btn-submit" id="submitBtn">保存进度到时间轴</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'folder_timeline_demo_v1';
+
+  // 默认演示数据，方便直接看版式效果
+  const defaultData = {
+    activeId: 'p1',
+    projects: [
+      {
+        id: 'p1',
+        name: '个人记账小程序',
+        logs: [
+          {
+            id: 'l3',
+            time: '2025-02-20 22:40',
+            done: '完成了用户登录接口的验证逻辑，前端表单校验也加上了。',
+            stuck: '目前数据库写入还有个小 Bug，报错提示字段长度溢出。',
+            next: '打开 user.py 第 45 行，检查密码加密字段的长度限制。'
+          },
+          {
+            id: 'l2',
+            time: '2025-02-14 21:15',
+            done: '搭建好了基础数据库表结构，写通了注册接口。',
+            stuck: '还没做 Token 过期刷新。',
+            next: '先写登录验证逻辑，暂时不管 Token 刷新。'
+          },
+          {
+            id: 'l1',
+            time: '2025-02-08 16:00',
+            done: '初始化项目目录，确定了只做“记一笔+看列表”两个页面的 MVP 范围。',
+            stuck: '无卡点。',
+            next: '设计用户表和账单表字段。'
+          }
+        ]
+      },
+      {
+        id: 'p2',
+        name: 'AI 阅读笔记工具',
+        logs: [
+          {
+            id: 'l4',
+            time: '2025-02-18 23:10',
+            done: '跑通了 PDF 文本提取脚本。',
+            stuck: '长文章直接丢给接口会超字数限制。',
+            next: '写一个按段落切分文本的函数，每段控制在 1500 字以内。'
+          }
+        ]
+      }
+    ]
+  };
+
+  let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
+  const $ = id => document.getElementById(id);
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function getActiveProject() {
+    return state.projects.find(p => p.id === state.activeId) || state.projects[0];
+  }
+
+  function renderTabs() {
+    const bar = $('tabsBar');
+    bar.innerHTML = '';
+
+    state.projects.forEach(proj => {
+      const tab = document.createElement('div');
+      tab.className = 'tab-item' + (proj.id === state.activeId ? ' active' : '');
+      tab.textContent = proj.name;
+      tab.onclick = () => {
+        state.activeId = proj.id;
+        saveState();
+        renderAll();
+      };
+      bar.appendChild(tab);
+    });
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'tab-add';
+    addBtn.textContent = '+ 新建项目';
+    addBtn.onclick = () => {
+      const name = prompt('请输入新项目（文件夹）名称：');
+      if (!name || !name.trim()) return;
+      const newProj = {
+        id: 'p_' + Date.now(),
+        name: name.trim(),
+        logs: []
+      };
+      state.projects.push(newProj);
+      state.activeId = newProj.id;
+      saveState();
+      renderAll();
+    };
+    bar.appendChild(addBtn);
+  }
+
+  function renderTimeline(proj) {
+    const container = $('timeline');
+    container.innerHTML = '';
+
+    if (proj.logs.length === 0) {
+      container.innerHTML = '<div class="empty-state">这个文件夹还是空的，在下方记录第一条进度吧 👇</div>';
+      return;
+    }
+
+    proj.logs.forEach((log, index) => {
+      const isLatest = index === 0;
+      const node = document.createElement('div');
+      // 最新的一条默认展开，过往记录默认加上 collapsed 类折叠起来
+      node.className = 'tl-node' + (isLatest ? ' is-latest' : ' collapsed');
+
+      const dot = document.createElement('div');
+      dot.className = 'tl-dot';
+
+      const header = document.createElement('div');
+      header.className = 'tl-header';
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'tl-time';
+      timeSpan.textContent = log.time;
+      header.appendChild(timeSpan);
+
+      if (isLatest) {
+        const badge = document.createElement('span');
+        badge.className = 'tl-badge';
+        badge.textContent = '最新进度';
+        header.appendChild(badge);
+      }
+
+      const hint = document.createElement('span');
+      hint.className = 'tl-toggle-hint';
+      hint.textContent = isLatest ? '收起 ▲' : '展开 ▼';
+      header.appendChild(hint);
+
+      // 点击时间行切换折叠/展开
+      header.onclick = () => {
+        const isCollapsed = node.classList.toggle('collapsed');
+        hint.textContent = isCollapsed ? '展开 ▼' : '收起 ▲';
+      };
+
+      // 详情内容块
+      const body = document.createElement('div');
+      body.className = 'tl-body';
+
+      const blocks = [
+        { label: '今天做了什么', cls: 'tag-done', val: log.done },
+        { label: '卡在了哪里 / 当前状态', cls: 'tag-stuck', val: log.stuck },
+        { label: '下次打开第一件要做的事', cls: 'tag-next', val: log.next }
+      ];
+
+      blocks.forEach(b => {
+        const item = document.createElement('div');
+        item.className = 'block-item';
+        const tag = document.createElement('span');
+        tag.className = 'block-tag ' + b.cls;
+        tag.textContent = b.label;
+        const text = document.createElement('div');
+        text.className = 'block-text';
+        text.textContent = b.val || '（未填写）';
+        item.appendChild(tag);
+        item.appendChild(text);
+        body.appendChild(item);
+      });
+
+      node.appendChild(dot);
+      node.appendChild(header);
+      node.appendChild(body);
+      container.appendChild(node);
+    });
+  }
+
+  function renderAll() {
+    renderTabs();
+    const proj = getActiveProject();
+    if (!proj) return;
+
+    $('projectTitle').textContent = proj.name;
+    $('projectMeta').textContent = `共 ${proj.logs.length} 条节点记录`;
+    renderTimeline(proj);
+  }
+
+  // 提交新记录
+  $('submitBtn').onclick = () => {
+    const done = $('inDone').value.trim();
+    const stuck = $('inStuck').value.trim();
+    const next = $('inNext').value.trim();
+
+    if (!done && !stuck && !next) {
+      alert('至少填写一项内容再保存哦');
+      return;
+    }
+
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const timeStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    const proj = getActiveProject();
+    proj.logs.unshift({
+      id: 'l_' + Date.now(),
+      time: timeStr,
+      done,
+      stuck,
+      next
+    });
+
+    $('inDone').value = '';
+    $('inStuck').value = '';
+    $('inNext').value = '';
+
+    saveState();
+    renderAll();
+  };
+
+  // 重命名项目
+  $('renameBtn').onclick = () => {
+    const proj = getActiveProject();
+    const newName = prompt('修改项目名称：', proj.name);
+    if (newName && newName.trim()) {
+      proj.name = newName.trim();
+      saveState();
+      renderAll();
+    }
+  };
+
+  // 删除项目
+  $('deleteBtn').onclick = () => {
+    if (state.projects.length <= 1) {
+      alert('至少需要保留一个项目标签');
+      return;
+    }
+    const proj = getActiveProject();
+    if (!confirm(`确定要删除「${proj.name}」及其所有时间轴记录吗？`)) return;
+    state.projects = state.projects.filter(p => p.id !== proj.id);
+    state.activeId = state.projects[0].id;
+    saveState();
+    renderAll();
+  };
+
+  renderAll();
+</script>
+</body>
+</html>
