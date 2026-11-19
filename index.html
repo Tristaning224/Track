@@ -340,7 +340,7 @@
 <div class="modal-mask" id="syncModal">
   <div class="modal-box">
     <div class="modal-title">🔑 私人密码云同步</div>
-    <div class="modal-desc">输入你在 Cloudflare Worker 中设定的私人密码，即可在当前设备自动同步所有进度。</div>
+    <div class="modal-desc">输入你在 Cloudflare Worker 中设定的私人密码，即可在当前设备自动合并同步所有进度。</div>
     <div class="modal-field" id="apiFieldWrap">
       <label>云接口网址（Worker URL）</label>
       <input type="text" id="cfgApiUrl" placeholder="https://my-sync.ningtrista.workers.dev" />
@@ -375,14 +375,18 @@
     isDefault: true,
     updatedAt: 0,
     activeId: 'p1',
+    deletedProjectIds: [],
+    deletedLogIds: [],
     projects: [
       {
         id: 'p1',
         name: '我的第一个项目',
+        updatedAt: 0,
         logs: [
           {
             id: 'l_demo',
             time: '示例记录',
+            createdAt: 0,
             done: '部署好了个人项目进度记录网页。',
             stuck: '暂无卡点。',
             next: '点击右上角“重命名”改成自己的项目名称，在下方写下第一条真实进度。'
@@ -402,10 +406,11 @@
   }
 
   let state = safeParse(STORAGE_KEY, defaultData);
+  state.deletedProjectIds = state.deletedProjectIds || [];
+  state.deletedLogIds = state.deletedLogIds || [];
+
   let auth = safeParse(AUTH_KEY, { apiUrl: DEFAULT_API_URL, password: '' });
-  if (DEFAULT_API_URL) {
-    auth.apiUrl = DEFAULT_API_URL;
-  }
+  if (DEFAULT_API_URL) auth.apiUrl = DEFAULT_API_URL;
 
   const $ = id => document.getElementById(id);
 
@@ -425,39 +430,152 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  // ================= Worker 云同步核心 =================
+  // ================= 核心：按 ID 双向智能合并（永不互相覆盖） =================
+  function getLogTs(log) {
+    if (log.createdAt) return log.createdAt;
+    const m = /^l_(\d+)$/.exec(log.id || '');
+    if (m) return Number(m[1]);
+    if (log.time && log.time !== '示例记录') {
+      const parsed = Date.parse(log.time.replace(' ', 'T'));
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  }
+
+  function mergeStates(localState, remoteState, preferredActiveId) {
+    if (!remoteState || remoteState.empty || !remoteState.projects) return localState;
+    if (localState.isDefault && !remoteState.isDefault) {
+      return {
+        ...remoteState,
+        deletedProjectIds: remoteState.deletedProjectIds || [],
+        deletedLogIds: remoteState.deletedLogIds || []
+      };
+    }
+
+    const delProjSet = new Set([
+      ...(localState.deletedProjectIds || []),
+      ...(remoteState.deletedProjectIds || [])
+    ]);
+    const delLogSet = new Set([
+      ...(localState.deletedLogIds || []),
+      ...(remoteState.deletedLogIds || [])
+    ]);
+
+    const projMap = new Map();
+    const ingestProject = (p) => {
+      if (!p || delProjSet.has(p.id)) return;
+      if (!projMap.has(p.id)) {
+        projMap.set(p.id, {
+          id: p.id,
+          name: p.name,
+          updatedAt: p.updatedAt || 0,
+          logs: [...(p.logs || [])]
+        });
+      } else {
+        const existing = projMap.get(p.id);
+        // 项目名取更新的那一边
+        if ((p.updatedAt || 0) >= (existing.updatedAt || 0)) {
+          existing.name = p.name;
+          existing.updatedAt = p.updatedAt || existing.updatedAt;
+        }
+        existing.logs = existing.logs.concat(p.logs || []);
+      }
+    };
+
+    (remoteState.projects || []).forEach(ingestProject);
+    (localState.projects || []).forEach(ingestProject);
+
+    const mergedProjects = [];
+    for (const proj of projMap.values()) {
+      const logMap = new Map();
+      for (const log of proj.logs) {
+        if (!log || delLogSet.has(log.id)) continue;
+        if (!logMap.has(log.id)) {
+          logMap.set(log.id, log);
+        }
+      }
+      const uniqueLogs = Array.from(logMap.values()).sort((a, b) => getLogTs(b) - getLogTs(a));
+      mergedProjects.push({
+        id: proj.id,
+        name: proj.name,
+        updatedAt: proj.updatedAt,
+        logs: uniqueLogs
+      });
+    }
+
+    if (mergedProjects.length === 0) {
+      mergedProjects.push({ id: 'p_' + Date.now(), name: '我的项目', updatedAt: Date.now(), logs: [] });
+    }
+
+    const activeExists = mergedProjects.some(p => p.id === preferredActiveId);
+    return {
+      updatedAt: Math.max(localState.updatedAt || 0, remoteState.updatedAt || 0),
+      activeId: activeExists ? preferredActiveId : mergedProjects[0].id,
+      deletedProjectIds: Array.from(delProjSet).slice(-200),
+      deletedLogIds: Array.from(delLogSet).slice(-500),
+      projects: mergedProjects
+    };
+  }
+
+  function contentSignature(s) {
+    return JSON.stringify({
+      projects: s.projects || [],
+      deletedProjectIds: s.deletedProjectIds || [],
+      deletedLogIds: s.deletedLogIds || []
+    });
+  }
+
+  // ================= Worker 通信（带 6 秒超时） =================
   async function apiFetch(method = 'GET', bodyData = null) {
     const url = auth.apiUrl.replace(/\/+$/, '');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
     const opts = {
       method,
       cache: 'no-store',
+      signal: controller.signal,
       headers: { 'X-Password': auth.password }
     };
     if (bodyData) {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(bodyData);
     }
-    const res = await fetch(url, opts);
-    if (res.status === 401) throw new Error('AUTH_FAIL');
-    if (res.status === 500) throw new Error('SERVER_500');
-    if (!res.ok) throw new Error('HTTP_' + res.status);
-    return res.json();
+    try {
+      const res = await fetch(url, opts);
+      if (res.status === 401) throw new Error('AUTH_FAIL');
+      if (res.status === 500) throw new Error('SERVER_500');
+      if (!res.ok) throw new Error('HTTP_' + res.status);
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  async function pullAndMerge() {
+  let syncInFlight = false;
+  async function syncWithCloud(forcePushIfLocalChanged = false) {
     if (!auth.apiUrl || !auth.password) return false;
-    setSyncUI('syncing', '☁️ 同步中...');
+    if (syncInFlight) return true;
+    syncInFlight = true;
+    setSyncUI('syncing', '☁️ 同步合并中...');
     try {
       const remote = await apiFetch('GET');
       if (remote && !remote.empty && remote.projects) {
-        const remoteTime = remote.updatedAt || 0;
-        const localTime = state.updatedAt || 0;
-        if (state.isDefault || remoteTime > localTime) {
-          state = remote;
+        const merged = mergeStates(state, remote, state.activeId);
+        const localChanged = contentSignature(merged) !== contentSignature(state);
+        const remoteNeedsUpdate = forcePushIfLocalChanged || (contentSignature(merged) !== contentSignature(remote));
+
+        if (localChanged || state.isDefault) {
+          state = merged;
           saveLocal(false);
           renderAll();
-        } else if (localTime > remoteTime) {
-          await apiFetch('POST', state);
+        }
+        if (remoteNeedsUpdate && !state.isDefault) {
+          const postRes = await apiFetch('POST', state);
+          if (postRes && postRes.data && postRes.data.projects) {
+            state = mergeStates(state, postRes.data, state.activeId);
+            saveLocal(false);
+            renderAll();
+          }
         }
       } else if (!state.isDefault) {
         await apiFetch('POST', state);
@@ -468,34 +586,22 @@
       if (e.message === 'AUTH_FAIL') {
         setSyncUI('err', '🔒 密码错误（点击重输）');
       } else if (e.message === 'SERVER_500') {
-        setSyncUI('err', '⚠️ 云端500（请检查KV是否绑定TIMELINE_KV）');
+        setSyncUI('err', '⚠️ 云端500（检查KV绑定）');
+      } else if (e.name === 'AbortError') {
+        setSyncUI('err', '⚠️ 连接超时（检查梯子后点🔄）');
       } else {
-        setSyncUI('err', '⚠️ 网络同步失败（点🔄重试）');
+        setSyncUI('err', '⚠️ 网络失败（已存本地，点🔄重试）');
       }
       return false;
-    }
-  }
-
-  async function pushToCloud() {
-    if (!auth.apiUrl || !auth.password) return;
-    setSyncUI('syncing', '☁️ 保存中...');
-    try {
-      await apiFetch('POST', state);
-      setSyncUI('ok', '☁️ 已同步 ' + new Date().toTimeString().slice(0, 5));
-    } catch (e) {
-      if (e.message === 'AUTH_FAIL') {
-        setSyncUI('err', '🔒 密码错误');
-      } else if (e.message === 'SERVER_500') {
-        setSyncUI('err', '⚠️ 云端500（请检查KV绑定）');
-      } else {
-        setSyncUI('err', '⚠️ 已暂存本地（点🔄重试）');
-      }
+    } finally {
+      syncInFlight = false;
     }
   }
 
   function saveAndSync() {
     saveLocal(true);
-    pushToCloud();
+    renderAll();
+    syncWithCloud(true);
   }
 
   // ================= 渲染逻辑 =================
@@ -524,11 +630,10 @@
     addBtn.onclick = () => {
       const name = prompt('请输入新项目（文件夹）名称：');
       if (!name || !name.trim()) return;
-      const newProj = { id: 'p_' + Date.now(), name: name.trim(), logs: [] };
+      const newProj = { id: 'p_' + Date.now(), name: name.trim(), updatedAt: Date.now(), logs: [] };
       state.projects.push(newProj);
       state.activeId = newProj.id;
       saveAndSync();
-      renderAll();
     };
     bar.appendChild(addBtn);
   }
@@ -536,7 +641,7 @@
   function renderTimeline(proj) {
     const container = $('timeline');
     container.innerHTML = '';
-    if (proj.logs.length === 0) {
+    if (!proj.logs || proj.logs.length === 0) {
       container.innerHTML = '<div class="empty-state">这个文件夹还是空的，在下方记录第一条进度吧 👇</div>';
       return;
     }
@@ -602,9 +707,9 @@
       delLogBtn.textContent = '删除此条记录';
       delLogBtn.onclick = () => {
         if (!confirm('确定删除这条时间轴记录吗？')) return;
+        state.deletedLogIds.push(log.id);
         proj.logs.splice(index, 1);
         saveAndSync();
-        renderAll();
       };
       footer.appendChild(delLogBtn);
       body.appendChild(footer);
@@ -621,49 +726,37 @@
     const proj = getActiveProject();
     if (!proj) return;
     $('projectTitle').textContent = proj.name;
-    $('projectMeta').textContent = `共 ${proj.logs.length} 条节点记录`;
+    $('projectMeta').textContent = `共 ${(proj.logs || []).length} 条节点记录`;
     renderTimeline(proj);
   }
 
   // ================= 事件绑定 =================
-  $('submitBtn').onclick = async () => {
+  $('submitBtn').onclick = () => {
     const done = $('inDone').value.trim();
     const stuck = $('inStuck').value.trim();
     const next = $('inNext').value.trim();
     if (!done && !stuck && !next) return alert('至少填写一项内容再保存哦');
 
-    const btn = $('submitBtn');
-    btn.disabled = true;
-    btn.textContent = '正在同步保存...';
-
-    const targetProjId = state.activeId;
-    if (auth.apiUrl && auth.password) {
-      try {
-        const remote = await apiFetch('GET');
-        if (remote && !remote.empty && remote.projects && (remote.updatedAt || 0) > (state.updatedAt || 0)) {
-          state = remote;
-        }
-      } catch (e) { /* 断网时先存本地 */ }
-    }
-
-    const now = new Date();
+    const nowTs = Date.now();
+    const now = new Date(nowTs);
     const pad = n => String(n).padStart(2, '0');
     const timeStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-    let proj = state.projects.find(p => p.id === targetProjId) || state.projects[0];
-    state.activeId = proj.id;
-    proj.logs.unshift({ id: 'l_' + Date.now(), time: timeStr, done, stuck, next });
+    const proj = getActiveProject();
+    proj.logs.unshift({
+      id: 'l_' + nowTs + '_' + Math.random().toString(36).slice(2, 6),
+      createdAt: nowTs,
+      time: timeStr,
+      done,
+      stuck,
+      next
+    });
 
     $('inDone').value = '';
     $('inStuck').value = '';
     $('inNext').value = '';
 
-    saveLocal(true);
-    renderAll();
-    await pushToCloud();
-
-    btn.disabled = false;
-    btn.textContent = '保存进度到时间轴';
+    saveAndSync();
   };
 
   $('renameBtn').onclick = () => {
@@ -671,8 +764,8 @@
     const newName = prompt('修改项目名称：', proj.name);
     if (newName && newName.trim()) {
       proj.name = newName.trim();
+      proj.updatedAt = Date.now();
       saveAndSync();
-      renderAll();
     }
   };
 
@@ -680,10 +773,10 @@
     if (state.projects.length <= 1) return alert('至少需要保留一个项目标签');
     const proj = getActiveProject();
     if (!confirm(`确定要删除「${proj.name}」及其所有时间轴记录吗？`)) return;
+    state.deletedProjectIds.push(proj.id);
     state.projects = state.projects.filter(p => p.id !== proj.id);
     state.activeId = state.projects[0].id;
     saveAndSync();
-    renderAll();
   };
 
   function openAuthModal() {
@@ -709,7 +802,7 @@
     auth = { apiUrl, password };
     localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
     $('syncModal').classList.remove('open');
-    const ok = await pullAndMerge();
+    const ok = await syncWithCloud();
     if (!ok) openAuthModal();
   };
   $('cfgPwd').onkeydown = (e) => { if (e.key === 'Enter') $('saveSyncBtn').click(); };
@@ -722,11 +815,11 @@
     setSyncUI('none', '🔑 点击输入同步密码');
   };
 
-  $('manualSyncBtn').onclick = pullAndMerge;
+  $('manualSyncBtn').onclick = () => syncWithCloud(false);
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && auth.apiUrl && auth.password) {
-      pullAndMerge();
+      syncWithCloud(false);
     }
   });
 
@@ -746,11 +839,10 @@
       try {
         const imported = JSON.parse(ev.target.result);
         if (imported.projects) {
-          state = imported;
+          state = mergeStates(state, imported, state.activeId);
           saveAndSync();
-          renderAll();
           $('syncModal').classList.remove('open');
-          alert('导入并同步成功！');
+          alert('导入并合并成功！');
         }
       } catch { alert('文件格式不对'); }
     };
@@ -759,7 +851,7 @@
 
   renderAll();
   if (auth.apiUrl && auth.password) {
-    pullAndMerge();
+    syncWithCloud(false);
   } else {
     openAuthModal();
   }
