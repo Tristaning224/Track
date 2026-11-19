@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>项目进度时间轴 - 版式预览</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>项目进度时间轴</title>
   <style>
     :root {
       --bg: #eef2f6;
@@ -20,26 +21,55 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
-      padding: 20px 14px 40px;
+      padding: 14px 14px 40px;
       line-height: 1.5;
     }
-    .app-wrapper {
-      max-width: 720px;
-      margin: 0 auto;
-    }
+    .app-wrapper { max-width: 720px; margin: 0 auto; }
 
-    /* ================= 文件夹 Tab 栏 ================= */
+    /* 顶部云同步状态栏 */
+    .sync-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .sync-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(255,255,255,0.8);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .sync-pill:hover { background: #fff; color: var(--text); }
+    .sync-pill.connected { color: #166534; border-color: #bbf7d0; background: #f0fdf4; }
+    .sync-pill.error { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
+    .sync-refresh {
+      background: rgba(255,255,255,0.8);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .sync-refresh:hover { background: #fff; color: var(--primary); }
+
+    /* 文件夹 Tab 栏 */
     .tabs-bar {
       display: flex;
       align-items: flex-end;
       gap: 4px;
       overflow-x: auto;
       padding: 0 4px;
-      /* 隐藏滚动条保持美观 */
       scrollbar-width: none;
     }
     .tabs-bar::-webkit-scrollbar { display: none; }
-
     .tab-item {
       padding: 10px 18px;
       background: var(--tab-inactive);
@@ -49,15 +79,9 @@
       font-weight: 500;
       cursor: pointer;
       white-space: nowrap;
-      transition: all 0.15s;
-      border: 1px solid transparent;
-      border-bottom: none;
       user-select: none;
     }
-    .tab-item:hover {
-      background: #e5eaf0;
-      color: var(--text);
-    }
+    .tab-item:hover { background: #e5eaf0; color: var(--text); }
     .tab-item.active {
       background: var(--surface);
       color: var(--primary);
@@ -78,13 +102,9 @@
       cursor: pointer;
       white-space: nowrap;
     }
-    .tab-add:hover {
-      background: rgba(255,255,255,0.5);
-      color: var(--primary);
-      border-color: var(--primary);
-    }
+    .tab-add:hover { background: rgba(255,255,255,0.5); color: var(--primary); border-color: var(--primary); }
 
-    /* ================= 主体卡片容器 ================= */
+    /* 主体卡片容器 */
     .main-folder {
       background: var(--surface);
       border-radius: 0 12px 12px 12px;
@@ -93,8 +113,6 @@
       position: relative;
       z-index: 1;
     }
-
-    /* 第一部分头部：项目名称 */
     .project-header {
       display: flex;
       justify-content: space-between;
@@ -103,21 +121,9 @@
       margin-bottom: 20px;
       border-bottom: 1px solid var(--border);
     }
-    .project-title-wrap {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .project-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #0f172a;
-    }
-    .project-meta {
-      font-size: 12px;
-      color: var(--muted);
-    }
+    .project-title-wrap { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .project-title { font-size: 20px; font-weight: 700; color: #0f172a; }
+    .project-meta { font-size: 12px; color: var(--muted); }
     .project-actions button {
       background: none;
       border: none;
@@ -127,27 +133,17 @@
       padding: 4px 8px;
       border-radius: 4px;
     }
-    .project-actions button:hover {
-      background: #f1f5f9;
-      color: #dc2626;
-    }
+    .project-actions button:hover { background: #f1f5f9; color: #dc2626; }
 
-    /* ================= 第一部分：时间轴 ================= */
+    /* 时间轴 */
     .section-label {
       font-size: 12px;
       font-weight: 700;
-      text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--muted);
       margin-bottom: 14px;
     }
-
-    .timeline {
-      position: relative;
-      padding-left: 22px;
-      margin-bottom: 28px;
-    }
-    /* 时间轴竖线 */
+    .timeline { position: relative; padding-left: 22px; margin-bottom: 28px; }
     .timeline::before {
       content: "";
       position: absolute;
@@ -157,14 +153,8 @@
       width: 2px;
       background: var(--line);
     }
-
-    .tl-node {
-      position: relative;
-      margin-bottom: 14px;
-    }
+    .tl-node { position: relative; margin-bottom: 14px; }
     .tl-node:last-child { margin-bottom: 0; }
-
-    /* 时间轴圆点 */
     .tl-dot {
       position: absolute;
       left: -21px;
@@ -184,43 +174,11 @@
       left: -22px;
       top: 4px;
     }
-
-    /* 时间标题行（可点击折叠/展开） */
-    .tl-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      user-select: none;
-      padding: 2px 0;
-    }
-    .tl-time {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--muted);
-    }
-    .tl-node.is-latest .tl-time {
-      color: var(--primary);
-      font-size: 14px;
-    }
-    .tl-badge {
-      font-size: 11px;
-      background: #eff6ff;
-      color: var(--primary);
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-weight: 500;
-    }
-    .tl-toggle-hint {
-      font-size: 12px;
-      color: #94a3b8;
-      margin-left: auto;
-    }
-    .tl-header:hover .tl-time {
-      color: var(--text);
-    }
-
-    /* 展开后的详情内容卡片 */
+    .tl-header { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; padding: 2px 0; }
+    .tl-time { font-size: 13px; font-weight: 600; color: var(--muted); }
+    .tl-node.is-latest .tl-time { color: var(--primary); font-size: 14px; }
+    .tl-badge { font-size: 11px; background: #eff6ff; color: var(--primary); padding: 1px 6px; border-radius: 4px; font-weight: 500; }
+    .tl-toggle-hint { font-size: 12px; color: #94a3b8; margin-left: auto; }
     .tl-body {
       margin-top: 8px;
       background: #f8fafc;
@@ -231,56 +189,23 @@
       flex-direction: column;
       gap: 10px;
     }
-    .tl-node.is-latest .tl-body {
-      background: #f8faff;
-      border-color: #dbeafe;
-    }
-    .tl-node.collapsed .tl-body {
-      display: none;
-    }
-
-    .block-item {
-      font-size: 14px;
-    }
-    .block-tag {
-      display: inline-block;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 4px;
-      margin-bottom: 4px;
-    }
+    .tl-node.is-latest .tl-body { background: #f8faff; border-color: #dbeafe; }
+    .tl-node.collapsed .tl-body { display: none; }
+    .block-item { font-size: 14px; }
+    .block-tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 4px; margin-bottom: 4px; }
     .tag-done { background: #dcfce7; color: #166534; }
     .tag-stuck { background: #fef3c7; color: #92400e; }
     .tag-next { background: #dbeafe; color: #1e40af; }
-    .block-text {
-      color: var(--text);
-      white-space: pre-wrap;
-      padding-left: 2px;
-    }
+    .block-text { color: var(--text); white-space: pre-wrap; padding-left: 2px; }
+    .tl-footer { display: flex; justify-content: flex-end; padding-top: 4px; }
+    .btn-del-log { background: none; border: none; color: #94a3b8; font-size: 12px; cursor: pointer; }
+    .btn-del-log:hover { color: #dc2626; }
 
-    /* ================= 第二部分：下方三段式输入区 ================= */
-    .input-section {
-      border-top: 2px dashed var(--border);
-      padding-top: 22px;
-    }
-    .input-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .field-group label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: var(--text);
-    }
-    .field-group label span {
-      font-weight: 400;
-      color: var(--muted);
-      font-size: 12px;
-    }
+    /* 下方三段式输入区 */
+    .input-section { border-top: 2px dashed var(--border); padding-top: 22px; }
+    .input-grid { display: flex; flex-direction: column; gap: 14px; }
+    .field-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+    .field-group label span { font-weight: 400; color: var(--muted); font-size: 12px; }
     .field-group textarea {
       width: 100%;
       padding: 10px 12px;
@@ -290,25 +215,10 @@
       font-family: inherit;
       resize: vertical;
       background: #fcfcfd;
-      transition: border-color 0.15s, background 0.15s;
     }
-    .field-group textarea:focus {
-      outline: none;
-      border-color: var(--primary);
-      background: #fff;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
-    /* 让“下一步”输入框视觉更突出 */
-    .field-group.highlight-input textarea {
-      border-color: #bfdbfe;
-      background: #f8faff;
-    }
-
-    .submit-row {
-      margin-top: 16px;
-      display: flex;
-      justify-content: flex-end;
-    }
+    .field-group textarea:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+    .field-group.highlight-input textarea { border-color: #bfdbfe; background: #f8faff; }
+    .submit-row { margin-top: 16px; display: flex; justify-content: flex-end; }
     .btn-submit {
       background: var(--primary);
       color: white;
@@ -320,27 +230,75 @@
       cursor: pointer;
     }
     .btn-submit:hover { background: #1d4ed8; }
+    .btn-submit:disabled { background: #93c5fd; cursor: not-allowed; }
+    .empty-state { color: var(--muted); font-size: 14px; padding: 16px 0; }
 
-    .empty-state {
+    /* 密码弹窗 */
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+    .modal-mask.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      width: 100%;
+      max-width: 400px;
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .modal-desc { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .modal-field { margin-bottom: 14px; }
+    .modal-field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .modal-field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .btn-secondary {
+      background: #f1f5f9;
+      color: var(--text);
+      border: none;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .backup-row {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
       color: var(--muted);
-      font-size: 14px;
-      padding: 16px 0;
     }
 
-    @media (max-width: 520px) {
-      .main-folder { padding: 16px; }
-    }
+    @media (max-width: 520px) { .main-folder { padding: 16px; } }
   </style>
 </head>
 <body>
 
 <div class="app-wrapper">
-  <!-- 顶部文件夹式 Tab -->
+  <div class="sync-bar">
+    <button class="sync-refresh" id="manualSyncBtn" style="display:none;">🔄 同步</button>
+    <div class="sync-pill" id="syncPill">🔑 点击输入同步密码</div>
+  </div>
+
   <div class="tabs-bar" id="tabsBar"></div>
 
-  <!-- 主体内容区 -->
   <div class="main-folder">
-    <!-- 项目标题行 -->
     <div class="project-header">
       <div class="project-title-wrap">
         <h1 class="project-title" id="projectTitle"></h1>
@@ -352,11 +310,9 @@
       </div>
     </div>
 
-    <!-- 第一部分：时间轴展示 -->
     <div class="section-label">📅 进度时间轴（点击过往时间可展开详情）</div>
     <div class="timeline" id="timeline"></div>
 
-    <!-- 第二部分：三块输入区 -->
     <div class="input-section">
       <div class="section-label">✍️ 结束前登记本次进度</div>
       <div class="input-grid">
@@ -380,63 +336,169 @@
   </div>
 </div>
 
-<script>
-  const STORAGE_KEY = 'folder_timeline_demo_v1';
+<!-- 私人密码登录弹窗 -->
+<div class="modal-mask" id="syncModal">
+  <div class="modal-box">
+    <div class="modal-title">🔑 私人密码云同步</div>
+    <div class="modal-desc">输入你在 Cloudflare Worker 中设定的私人密码，即可在当前设备自动同步所有进度。</div>
+    <div class="modal-field" id="apiFieldWrap">
+      <label>云接口网址（Worker URL）</label>
+      <input type="text" id="cfgApiUrl" placeholder="https://my-sync.ningtrista.workers.dev" />
+    </div>
+    <div class="modal-field">
+      <label>私人密码</label>
+      <input type="password" id="cfgPwd" placeholder="输入你的同步密码" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="clearSyncBtn" style="margin-right:auto;color:#dc2626;">清除本机密码</button>
+      <button class="btn-secondary" id="closeModalBtn">取消</button>
+      <button class="btn-submit" id="saveSyncBtn" style="padding:9px 18px;">验证并同步</button>
+    </div>
+    <div class="backup-row">
+      <span>本地备份：</span>
+      <div>
+        <button class="btn-secondary" id="exportBtn" style="padding:4px 10px;font-size:12px;">导出 JSON</button>
+        <button class="btn-secondary" id="importBtn" style="padding:4px 10px;font-size:12px;">导入</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" />
+      </div>
+    </div>
+  </div>
+</div>
 
-  // 默认演示数据，方便直接看版式效果
+<script>
+  const DEFAULT_API_URL = 'https://my-sync.ningtrista.workers.dev';
+
+  const STORAGE_KEY = 'folder_timeline_demo_v1';
+  const AUTH_KEY = 'folder_timeline_auth_v1';
+
   const defaultData = {
+    isDefault: true,
+    updatedAt: 0,
     activeId: 'p1',
     projects: [
       {
         id: 'p1',
-        name: '个人记账小程序',
+        name: '我的第一个项目',
         logs: [
           {
-            id: 'l3',
-            time: '2025-02-20 22:40',
-            done: '完成了用户登录接口的验证逻辑，前端表单校验也加上了。',
-            stuck: '目前数据库写入还有个小 Bug，报错提示字段长度溢出。',
-            next: '打开 user.py 第 45 行，检查密码加密字段的长度限制。'
-          },
-          {
-            id: 'l2',
-            time: '2025-02-14 21:15',
-            done: '搭建好了基础数据库表结构，写通了注册接口。',
-            stuck: '还没做 Token 过期刷新。',
-            next: '先写登录验证逻辑，暂时不管 Token 刷新。'
-          },
-          {
-            id: 'l1',
-            time: '2025-02-08 16:00',
-            done: '初始化项目目录，确定了只做“记一笔+看列表”两个页面的 MVP 范围。',
-            stuck: '无卡点。',
-            next: '设计用户表和账单表字段。'
-          }
-        ]
-      },
-      {
-        id: 'p2',
-        name: 'AI 阅读笔记工具',
-        logs: [
-          {
-            id: 'l4',
-            time: '2025-02-18 23:10',
-            done: '跑通了 PDF 文本提取脚本。',
-            stuck: '长文章直接丢给接口会超字数限制。',
-            next: '写一个按段落切分文本的函数，每段控制在 1500 字以内。'
+            id: 'l_demo',
+            time: '示例记录',
+            done: '部署好了个人项目进度记录网页。',
+            stuck: '暂无卡点。',
+            next: '点击右上角“重命名”改成自己的项目名称，在下方写下第一条真实进度。'
           }
         ]
       }
     ]
   };
 
-  let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
+  function safeParse(key, fallback) {
+    try {
+      const val = localStorage.getItem(key);
+      return val ? JSON.parse(val) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  let state = safeParse(STORAGE_KEY, defaultData);
+  let auth = safeParse(AUTH_KEY, { apiUrl: DEFAULT_API_URL, password: '' });
+  if (DEFAULT_API_URL) {
+    auth.apiUrl = DEFAULT_API_URL;
+  }
+
   const $ = id => document.getElementById(id);
 
-  function saveState() {
+  function setSyncUI(status, text) {
+    const pill = $('syncPill');
+    const refreshBtn = $('manualSyncBtn');
+    pill.className = 'sync-pill' + (status === 'ok' ? ' connected' : status === 'err' ? ' error' : '');
+    pill.textContent = text;
+    refreshBtn.style.display = (auth.apiUrl && auth.password) ? 'inline-block' : 'none';
+  }
+
+  function saveLocal(markDirty = true) {
+    if (markDirty) {
+      delete state.isDefault;
+      state.updatedAt = Date.now();
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  // ================= Worker 云同步核心 =================
+  async function apiFetch(method = 'GET', bodyData = null) {
+    const url = auth.apiUrl.replace(/\/+$/, '');
+    const opts = {
+      method,
+      cache: 'no-store',
+      headers: { 'X-Password': auth.password }
+    };
+    if (bodyData) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(bodyData);
+    }
+    const res = await fetch(url, opts);
+    if (res.status === 401) throw new Error('AUTH_FAIL');
+    if (res.status === 500) throw new Error('SERVER_500');
+    if (!res.ok) throw new Error('HTTP_' + res.status);
+    return res.json();
+  }
+
+  async function pullAndMerge() {
+    if (!auth.apiUrl || !auth.password) return false;
+    setSyncUI('syncing', '☁️ 同步中...');
+    try {
+      const remote = await apiFetch('GET');
+      if (remote && !remote.empty && remote.projects) {
+        const remoteTime = remote.updatedAt || 0;
+        const localTime = state.updatedAt || 0;
+        if (state.isDefault || remoteTime > localTime) {
+          state = remote;
+          saveLocal(false);
+          renderAll();
+        } else if (localTime > remoteTime) {
+          await apiFetch('POST', state);
+        }
+      } else if (!state.isDefault) {
+        await apiFetch('POST', state);
+      }
+      setSyncUI('ok', '☁️ 已同步 ' + new Date().toTimeString().slice(0, 5));
+      return true;
+    } catch (e) {
+      if (e.message === 'AUTH_FAIL') {
+        setSyncUI('err', '🔒 密码错误（点击重输）');
+      } else if (e.message === 'SERVER_500') {
+        setSyncUI('err', '⚠️ 云端500（请检查KV是否绑定TIMELINE_KV）');
+      } else {
+        setSyncUI('err', '⚠️ 网络同步失败（点🔄重试）');
+      }
+      return false;
+    }
+  }
+
+  async function pushToCloud() {
+    if (!auth.apiUrl || !auth.password) return;
+    setSyncUI('syncing', '☁️ 保存中...');
+    try {
+      await apiFetch('POST', state);
+      setSyncUI('ok', '☁️ 已同步 ' + new Date().toTimeString().slice(0, 5));
+    } catch (e) {
+      if (e.message === 'AUTH_FAIL') {
+        setSyncUI('err', '🔒 密码错误');
+      } else if (e.message === 'SERVER_500') {
+        setSyncUI('err', '⚠️ 云端500（请检查KV绑定）');
+      } else {
+        setSyncUI('err', '⚠️ 已暂存本地（点🔄重试）');
+      }
+    }
+  }
+
+  function saveAndSync() {
+    saveLocal(true);
+    pushToCloud();
+  }
+
+  // ================= 渲染逻辑 =================
   function getActiveProject() {
     return state.projects.find(p => p.id === state.activeId) || state.projects[0];
   }
@@ -444,14 +506,13 @@
   function renderTabs() {
     const bar = $('tabsBar');
     bar.innerHTML = '';
-
     state.projects.forEach(proj => {
       const tab = document.createElement('div');
       tab.className = 'tab-item' + (proj.id === state.activeId ? ' active' : '');
       tab.textContent = proj.name;
       tab.onclick = () => {
         state.activeId = proj.id;
-        saveState();
+        saveLocal(false);
         renderAll();
       };
       bar.appendChild(tab);
@@ -463,14 +524,10 @@
     addBtn.onclick = () => {
       const name = prompt('请输入新项目（文件夹）名称：');
       if (!name || !name.trim()) return;
-      const newProj = {
-        id: 'p_' + Date.now(),
-        name: name.trim(),
-        logs: []
-      };
+      const newProj = { id: 'p_' + Date.now(), name: name.trim(), logs: [] };
       state.projects.push(newProj);
       state.activeId = newProj.id;
-      saveState();
+      saveAndSync();
       renderAll();
     };
     bar.appendChild(addBtn);
@@ -479,7 +536,6 @@
   function renderTimeline(proj) {
     const container = $('timeline');
     container.innerHTML = '';
-
     if (proj.logs.length === 0) {
       container.innerHTML = '<div class="empty-state">这个文件夹还是空的，在下方记录第一条进度吧 👇</div>';
       return;
@@ -488,7 +544,6 @@
     proj.logs.forEach((log, index) => {
       const isLatest = index === 0;
       const node = document.createElement('div');
-      // 最新的一条默认展开，过往记录默认加上 collapsed 类折叠起来
       node.className = 'tl-node' + (isLatest ? ' is-latest' : ' collapsed');
 
       const dot = document.createElement('div');
@@ -514,22 +569,18 @@
       hint.textContent = isLatest ? '收起 ▲' : '展开 ▼';
       header.appendChild(hint);
 
-      // 点击时间行切换折叠/展开
       header.onclick = () => {
         const isCollapsed = node.classList.toggle('collapsed');
         hint.textContent = isCollapsed ? '展开 ▼' : '收起 ▲';
       };
 
-      // 详情内容块
       const body = document.createElement('div');
       body.className = 'tl-body';
-
       const blocks = [
         { label: '今天做了什么', cls: 'tag-done', val: log.done },
         { label: '卡在了哪里 / 当前状态', cls: 'tag-stuck', val: log.stuck },
         { label: '下次打开第一件要做的事', cls: 'tag-next', val: log.next }
       ];
-
       blocks.forEach(b => {
         const item = document.createElement('div');
         item.className = 'block-item';
@@ -544,6 +595,20 @@
         body.appendChild(item);
       });
 
+      const footer = document.createElement('div');
+      footer.className = 'tl-footer';
+      const delLogBtn = document.createElement('button');
+      delLogBtn.className = 'btn-del-log';
+      delLogBtn.textContent = '删除此条记录';
+      delLogBtn.onclick = () => {
+        if (!confirm('确定删除这条时间轴记录吗？')) return;
+        proj.logs.splice(index, 1);
+        saveAndSync();
+        renderAll();
+      };
+      footer.appendChild(delLogBtn);
+      body.appendChild(footer);
+
       node.appendChild(dot);
       node.appendChild(header);
       node.appendChild(body);
@@ -555,70 +620,149 @@
     renderTabs();
     const proj = getActiveProject();
     if (!proj) return;
-
     $('projectTitle').textContent = proj.name;
     $('projectMeta').textContent = `共 ${proj.logs.length} 条节点记录`;
     renderTimeline(proj);
   }
 
-  // 提交新记录
-  $('submitBtn').onclick = () => {
+  // ================= 事件绑定 =================
+  $('submitBtn').onclick = async () => {
     const done = $('inDone').value.trim();
     const stuck = $('inStuck').value.trim();
     const next = $('inNext').value.trim();
+    if (!done && !stuck && !next) return alert('至少填写一项内容再保存哦');
 
-    if (!done && !stuck && !next) {
-      alert('至少填写一项内容再保存哦');
-      return;
+    const btn = $('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '正在同步保存...';
+
+    const targetProjId = state.activeId;
+    if (auth.apiUrl && auth.password) {
+      try {
+        const remote = await apiFetch('GET');
+        if (remote && !remote.empty && remote.projects && (remote.updatedAt || 0) > (state.updatedAt || 0)) {
+          state = remote;
+        }
+      } catch (e) { /* 断网时先存本地 */ }
     }
 
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const timeStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-    const proj = getActiveProject();
-    proj.logs.unshift({
-      id: 'l_' + Date.now(),
-      time: timeStr,
-      done,
-      stuck,
-      next
-    });
+    let proj = state.projects.find(p => p.id === targetProjId) || state.projects[0];
+    state.activeId = proj.id;
+    proj.logs.unshift({ id: 'l_' + Date.now(), time: timeStr, done, stuck, next });
 
     $('inDone').value = '';
     $('inStuck').value = '';
     $('inNext').value = '';
 
-    saveState();
+    saveLocal(true);
     renderAll();
+    await pushToCloud();
+
+    btn.disabled = false;
+    btn.textContent = '保存进度到时间轴';
   };
 
-  // 重命名项目
   $('renameBtn').onclick = () => {
     const proj = getActiveProject();
     const newName = prompt('修改项目名称：', proj.name);
     if (newName && newName.trim()) {
       proj.name = newName.trim();
-      saveState();
+      saveAndSync();
       renderAll();
     }
   };
 
-  // 删除项目
   $('deleteBtn').onclick = () => {
-    if (state.projects.length <= 1) {
-      alert('至少需要保留一个项目标签');
-      return;
-    }
+    if (state.projects.length <= 1) return alert('至少需要保留一个项目标签');
     const proj = getActiveProject();
     if (!confirm(`确定要删除「${proj.name}」及其所有时间轴记录吗？`)) return;
     state.projects = state.projects.filter(p => p.id !== proj.id);
     state.activeId = state.projects[0].id;
-    saveState();
+    saveAndSync();
     renderAll();
   };
 
+  function openAuthModal() {
+    $('cfgApiUrl').value = auth.apiUrl || DEFAULT_API_URL;
+    $('cfgPwd').value = auth.password || '';
+    $('apiFieldWrap').style.display = DEFAULT_API_URL ? 'none' : 'block';
+    $('syncModal').classList.add('open');
+    setTimeout(() => $('cfgPwd').focus(), 100);
+  }
+
+  $('syncPill').onclick = openAuthModal;
+  $('closeModalBtn').onclick = () => $('syncModal').classList.remove('open');
+  $('syncModal').onclick = (e) => {
+    if (e.target === $('syncModal')) $('syncModal').classList.remove('open');
+  };
+
+  $('saveSyncBtn').onclick = async () => {
+    const apiUrl = ($('cfgApiUrl').value.trim() || auth.apiUrl || DEFAULT_API_URL).trim();
+    const password = $('cfgPwd').value.trim();
+    if (!apiUrl) return alert('请填入 Cloudflare Worker 网址');
+    if (!password) return alert('请输入私人密码');
+
+    auth = { apiUrl, password };
+    localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+    $('syncModal').classList.remove('open');
+    const ok = await pullAndMerge();
+    if (!ok) openAuthModal();
+  };
+  $('cfgPwd').onkeydown = (e) => { if (e.key === 'Enter') $('saveSyncBtn').click(); };
+
+  $('clearSyncBtn').onclick = () => {
+    if (!confirm('确定清除本机保存的密码吗？（云端数据安全保留）')) return;
+    auth.password = '';
+    localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+    $('syncModal').classList.remove('open');
+    setSyncUI('none', '🔑 点击输入同步密码');
+  };
+
+  $('manualSyncBtn').onclick = pullAndMerge;
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && auth.apiUrl && auth.password) {
+      pullAndMerge();
+    }
+  });
+
+  $('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `project-timeline-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+  };
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (imported.projects) {
+          state = imported;
+          saveAndSync();
+          renderAll();
+          $('syncModal').classList.remove('open');
+          alert('导入并同步成功！');
+        }
+      } catch { alert('文件格式不对'); }
+    };
+    reader.readAsText(file);
+  };
+
   renderAll();
+  if (auth.apiUrl && auth.password) {
+    pullAndMerge();
+  } else {
+    openAuthModal();
+  }
 </script>
 </body>
 </html>
